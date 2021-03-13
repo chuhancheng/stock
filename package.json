@@ -1,0 +1,16 @@
+{
+  "name": "stock",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Darren",
+  "license": "ISC",
+  "dependencies": {
+    "crawler": "^1.3.0",
+    "csv-string": "^4.0.1",
+    "sqlite3": "^5.0.2"
+  }
+}
