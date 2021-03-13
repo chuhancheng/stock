@@ -11,6 +11,8 @@
   "dependencies": {
     "crawler": "^1.3.0",
     "csv-string": "^4.0.1",
+    "sequelize": "^6.5.0",
+    "sequelize-cli": "^6.2.0",
     "sqlite3": "^5.0.2"
   }
 }
