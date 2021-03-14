@@ -11,7 +11,7 @@ class TransactionInfoEachDayCrawler {
         let _this = this;
         this.crawler = new crawler({
             maxConnections : 1,
-            rateLimit: 1000,
+            rateLimit: 2000,
             callback : function (error, res, done) {
                 if(error){
                     console.log(error);
@@ -19,6 +19,7 @@ class TransactionInfoEachDayCrawler {
                     try {
                         let data = _this.dataHandler(res.body);
                         _this.save(data, res.options.stock_no);
+                        console.log('call save data');
                     } catch (e) {
                         console.warn('Error:', e);
                     }
@@ -36,15 +37,16 @@ class TransactionInfoEachDayCrawler {
             const date = `${year}${month.toString().padStart(2, '0')}${day.toString().padStart(2, '0')}`;
             this.targetList.forEach(company => {
                 const url = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=csv&date=${date}&stockNo=${company}`;
+                // console.log('----:url:', url);
                 this.crawler.queue({uri: url, stock_no: company});
-                return;
             });
-            if (this.startDate.getMonth() == 11) {
-                this.startDate.setYear(this.startDate.getYear() + 1);
-                this.startDate.setMonth(0);
+            if (this.startDate.getMonth() == 12) {
+                this.startDate.setYear(this.startDate.getYear() + 1 + 1901);
+                this.startDate.setMonth(1);
             } else {
                 this.startDate.setMonth(this.startDate.getMonth() + 1);
             }
+            // console.log('this.startDate:', this.startDate);
         }
         
         
@@ -83,7 +85,7 @@ class TransactionInfoEachDayCrawler {
 main();
 
 async function main () {
-    const startDate = new Date(2020, 0, 1);
+    const startDate = new Date(2020, 1, 1);
     const result = await db.Company.findAll({attributes: ['stock_no']});
     let targetList = result.map(item=>item.stock_no);
 
