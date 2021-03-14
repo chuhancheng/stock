@@ -1,321 +1,94 @@
 const crawler = require("crawler");
 const CSV = require('csv-string');
-const fs = require('fs');
-const file = 'stock.db';//這裡寫的就是資料庫檔案的路徑
-const exists = fs.existsSync(file);
-const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database(file);
+const db = require('../models');
+
+class TransactionInfoEachDayCrawler {
+    startDate = null;
+    crawler = null;
+    targetList = [];
+    constructor(startDate){
+        this.startDate = startDate;
+        let _this = this;
+        this.crawler = new crawler({
+            maxConnections : 1,
+            rateLimit: 1000,
+            callback : function (error, res, done) {
+                if(error){
+                    console.log(error);
+                }else{
+                    try {
+                        let data = _this.dataHandler(res.body);
+                        _this.save(data, res.options.stock_no);
+                    } catch (e) {
+                        console.warn('Error:', e);
+                    }
+                }
+                done();
+            }
+        });
+    };
+    trigger() {
+        const now = new Date();
+        while(this.startDate <= now) {
+            const year = this.startDate.getYear() + 1901;
+            const month = this.startDate.getMonth() + 1;
+            const day = this.startDate.getDate();
+            const date = `${year}${month.toString().padStart(2, '0')}${day.toString().padStart(2, '0')}`;
+            this.targetList.forEach(company => {
+                const url = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=csv&date=${date}&stockNo=${company}`;
+                this.crawler.queue({uri: url, stock_no: company});
+                return;
+            });
+            if (this.startDate.getMonth() == 11) {
+                this.startDate.setYear(this.startDate.getYear() + 1);
+                this.startDate.setMonth(0);
+            } else {
+                this.startDate.setMonth(this.startDate.getMonth() + 1);
+            }
+        }
+        
+        
+    }
+    dataHandler(body) {
+        const data = CSV.parse(body);
+        const validData = data.filter(item => {
+            return /^\d{2,3}\/\d{2,2}\/\d{2,2}$/.test(item[0]);
+        });
+        return validData;
+    }
+    save (validData, stock_no) {
+        validData.forEach( async (item) => {
+            const {year, month, day} = {
+                year: parseInt(item[0].split('/')[0]) + 1911, 
+                month: item[0].split('/')[1], 
+                day: item[0].split('/')[2]
+            };
+            let data = {
+                date: new Date(year, month, day,0,0,0,0),
+                stock_no: stock_no,
+                shares_traded: item[1].split(',').join(''),
+                turnover: item[2].split(',').join(''),
+                opening_price: item[3],
+                max_price: item[4],
+                min_price: item[5],
+                closing_price: item[6],
+                price_difference: item[7],
+                transaction_number: item[8].split(',').join('')
+            }
+            const result = await db.TransactionInfoEachDay.create(data);
+        })
+    }
+}
 
 main();
 
-function main () {
-    // trigger([dataSourceUrl(type1, 20210113, 2344)]);
-    const validData = dataHandler(testData());
-    save(validData);
-}
+async function main () {
+    const startDate = new Date(2020, 0, 1);
+    const result = await db.Company.findAll({attributes: ['stock_no']});
+    let targetList = result.map(item=>item.stock_no);
 
-function save (validData) {
-    const item = validData[0];
-    const statement = `INSERT INTO transaction_info_each_day (date, stock_no, shares_traded, turnover, opening_price, max_price, min_price, closing_price, price_difference, transaction_number)
-    VALUES ('${item.join(',')}');`;
-    console.log(statement);
-    db.run(statement);
-}
-
-function dataHandler (data) {
-    const validData = data.filter(item => {
-        return /^\d{2,3}\/\d{2,2}\/\d{2,2}$/.test(item[0]);
-    });
-    validData = validData.map(item => {
-        item[1] = item[1].split(',').join('');
-        return item;
-    });
-    return validData;
-}
-
-function trigger (list) {
-    const c = new crawler({
-        maxConnections : 1,
-        rateLimit: 1000,
-        callback : function (error, res, done) {
-            if(error){
-                console.log(error);
-            }else{
-                try {
-                    dataHandler(CSV.parse(res.body));
-                } catch (e) {
-                    console.log('Exception:', e);
-                }
-            }
-            done();
-        }
-    });
-    c.queue(list);
-}
-
-function dataSourceUrl (type, date, stockNo) {
-    const map = {
-        // 各日成交資訊
-        'type1': `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=csv&date=${date}&stockNo=${stockNo}`
-    }
-
-    return map[type];
-}
-
-function testData () {
-    return [
-        [ '110年01月 2344 華邦電           各日成交資訊' ],
-        [
-          '日期',     '成交股數',
-          '成交金額', '開盤價',
-          '最高價',   '最低價',
-          '收盤價',   '漲跌價差',
-          '成交筆數', ''
-        ],
-        [
-          '110/01/04',
-          '236,685,658',
-          '6,691,711,526',
-          '29.40',
-          '29.65',
-          '27.75',
-          '28.00',
-          '-1.05',
-          '79,750',
-          ''
-        ],
-        [
-          '110/01/05',
-          '146,312,854',
-          '4,157,863,270',
-          '28.20',
-          '28.85',
-          '28.10',
-          '28.45',
-          '+0.45',
-          '46,010',
-          ''
-        ],
-        [
-          '110/01/06',
-          '192,450,388',
-          '5,377,848,334',
-          '28.75',
-          '28.90',
-          '27.05',
-          '27.35',
-          '-1.10',
-          '60,269',
-          ''
-        ],
-        [
-          '110/01/07',
-          '143,571,698',
-          '3,952,943,285',
-          '27.80',
-          '28.15',
-          '26.70',
-          '27.60',
-          '+0.25',
-          '45,814',
-          ''
-        ],
-        [
-          '110/01/08',
-          '264,843,070',
-          '7,654,812,351',
-          '28.50',
-          '29.35',
-          '28.30',
-          '29.00',
-          '+1.40',
-          '81,167',
-          ''
-        ],
-        [
-          '110/01/11',
-          '120,763,873',
-          '3,453,070,496',
-          '28.95',
-          '29.00',
-          '28.30',
-          '28.45',
-          '-0.55',
-          '37,947',
-          ''
-        ],
-        [
-          '110/01/12',
-          '143,160,358',
-          '3,981,972,641',
-          '28.45',
-          '28.85',
-          '27.15',
-          '27.30',
-          '-1.15',
-          '46,234',
-          ''
-        ],
-        [
-          '110/01/13',
-          '75,233,523',
-          '2,096,326,591',
-          '27.70',
-          '28.20',
-          '27.45',
-          '27.70',
-          '+0.40',
-          '23,032',
-          ''
-        ],
-        [
-          '110/01/14',
-          '97,414,271',
-          '2,762,311,026',
-          '27.85',
-          '28.75',
-          '27.75',
-          '28.45',
-          '+0.75',
-          '30,329',
-          ''
-        ],
-        [
-          '110/01/15',
-          '98,096,522',
-          '2,742,758,181',
-          '28.75',
-          '28.90',
-          '27.50',
-          '27.50',
-          '-0.95',
-          '32,582',
-          ''
-        ],
-        [
-          '110/01/18',
-          '173,370,432',
-          '4,443,937,052',
-          '27.10',
-          '27.15',
-          '24.90',
-          '25.75',
-          '-1.75',
-          '54,610',
-          ''
-        ],
-        [
-          '110/01/19',
-          '102,178,584',
-          '2,700,760,026',
-          '26.05',
-          '26.85',
-          '25.85',
-          '26.60',
-          '+0.85',
-          '28,435',
-          ''
-        ],
-        [
-          '110/01/20',
-          '137,052,448',
-          '3,663,156,636',
-          '27.10',
-          '27.80',
-          '25.90',
-          '26.25',
-          '-0.35',
-          '41,452',
-          ''
-        ],
-        [
-          '110/01/21',
-          '145,709,068',
-          '3,962,907,741',
-          '26.70',
-          '27.80',
-          '26.65',
-          '27.00',
-          '+0.75',
-          '39,600',
-          ''
-        ],
-        [
-          '110/01/22',
-          '100,240,616',
-          '2,768,298,211',
-          '27.35',
-          '28.00',
-          '27.20',
-          '28.00',
-          '+1.00',
-          '31,457',
-          ''
-        ],
-        [
-          '110/01/25',
-          '164,540,551',
-          '4,661,507,369',
-          '28.25',
-          '28.85',
-          '27.45',
-          '28.80',
-          '+0.80',
-          '48,167',
-          ''
-        ],
-        [
-          '110/01/26',
-          '130,173,262',
-          '3,655,550,803',
-          '28.75',
-          '28.75',
-          '27.65',
-          '27.70',
-          '-1.10',
-          '38,802',
-          ''
-        ],
-        [
-          '110/01/27',
-          '73,133,152',
-          '2,040,629,842',
-          '27.95',
-          '28.25',
-          '27.60',
-          '27.80',
-          '+0.10',
-          '21,243',
-          ''
-        ],
-        [
-          '110/01/28',
-          '117,174,866',
-          '3,134,272,621',
-          '26.90',
-          '27.10',
-          '26.50',
-          '26.50',
-          '-1.30',
-          '35,994',
-          ''
-        ],
-        [
-          '110/01/29',
-          '87,063,900',
-          '2,344,577,631',
-          '27.00',
-          '27.50',
-          '26.45',
-          '26.45',
-          '-0.05',
-          '27,135',
-          ''
-        ],
-        [ '說明:' ],
-        [ '符號說明:+/-/X表示漲/跌/不比價' ],
-        [ '當日統計資訊含一般、零股、盤後定價、鉅額交易，不含拍賣、標購。' ],
-        [ 'ETF證券代號第六碼為K、M、S、C者，表示該ETF以外幣交易。' ],
-        [ '' ]
-      ];
+    const transactionInfoEachDayCrawler = new TransactionInfoEachDayCrawler(startDate);
+    transactionInfoEachDayCrawler.targetList = targetList;
+    
+    transactionInfoEachDayCrawler.trigger();
 }

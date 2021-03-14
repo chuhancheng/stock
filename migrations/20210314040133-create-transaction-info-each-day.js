@@ -9,7 +9,8 @@ module.exports = {
         type: Sequelize.INTEGER
       },
       date: {
-        type: Sequelize.INTEGER
+        allowNull: false,
+        type: Sequelize.DATE
       },
       stock_no: {
         type: Sequelize.INTEGER
@@ -38,11 +39,11 @@ module.exports = {
       transaction_number: {
         type: Sequelize.INTEGER
       },
-      created_at: {
+      createdAt: {
         allowNull: false,
         type: Sequelize.DATE
       },
-      updated_at: {
+      updatedAt: {
         allowNull: false,
         type: Sequelize.DATE
       }

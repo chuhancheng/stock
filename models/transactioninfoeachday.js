@@ -14,7 +14,7 @@ module.exports = (sequelize, DataTypes) => {
     }
   };
   TransactionInfoEachDay.init({
-    date: DataTypes.INTEGER,
+    date: DataTypes.DATE,
     stock_no: DataTypes.INTEGER,
     shares_traded: DataTypes.INTEGER,
     turnover: DataTypes.INTEGER,
@@ -27,7 +27,6 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'TransactionInfoEachDay',
-    underscored: true,
   });
   return TransactionInfoEachDay;
 };
