@@ -4,13 +4,14 @@ const db = require('../models');
 
 class TransactionInfoEachDayCrawler {
     constructor (startDate) {
-        this.startDate = null;
+        this.startDate = startDate;
         this.crawler = null;
         this.targetList = [];
         const _this = this;
         this.crawler = new Crawler({
             maxConnections: 1,
             rateLimit: 5000,
+            jQuery: false, // set false to suppress warning message.
             callback: function (error, res, done) {
                 if (error) {
                     console.log(error);
@@ -18,6 +19,7 @@ class TransactionInfoEachDayCrawler {
                     try {
                         const data = _this.dataHandler(res.body);
                         _this.save(data, res.options.stock_no);
+                        console.log('Save Complete:', res.options.uri);
                     } catch (e) {
                         console.warn('Error:', e);
                     }
@@ -27,18 +29,26 @@ class TransactionInfoEachDayCrawler {
         });
     }
 
+    async dataExist (date, stockNo) {
+        const result = await db.TransactionInfoEachDay.findAll({
+            where: {
+                date: date,
+                stock_no: stockNo
+            }
+        });
+        return result.length > 0;
+    }
+
     trigger () {
         const now = new Date();
         while (this.startDate <= now) {
             const year = this.startDate.getFullYear();
             const month = this.startDate.getMonth() + 1;
             const day = this.startDate.getDate();
-            const date = `${year}${month
-                .toString()
-                .padStart(2, '0')}${day.toString().padStart(2, '0')}`;
+            const date = `${year}${month.toString().padStart(2, '0')}${day.toString().padStart(2, '0')}`;
             this.targetList.forEach((company) => {
                 const url = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=csv&date=${date}&stockNo=${company}`;
-                // console.log(queue url:', url);
+                console.log('queue url:', url);
                 this.crawler.queue({
                     uri: url,
                     stock_no: company
@@ -69,11 +79,11 @@ class TransactionInfoEachDayCrawler {
                 day
             } = {
                 year: parseInt(item[0].split('/')[0]) + 1911,
-                month: item[0].split('/')[1],
+                month: parseInt(item[0].split('/')[1]) - 1,
                 day: item[0].split('/')[2]
             };
             const data = {
-                date: new Date(year, month, day, 0, 0, 0, 0),
+                date: new Date(Date.UTC(year, month, day)),
                 stock_no: stockNo,
                 shares_traded: item[1].split(',').join(''),
                 turnover: item[2].split(',').join(''),
@@ -98,7 +108,6 @@ async function main () {
         attributes: ['stock_no']
     });
     const targetList = result.map((item) => item.stock_no);
-
     const transactionInfoEachDayCrawler = new TransactionInfoEachDayCrawler(
         startDate
     );
