@@ -82,19 +82,24 @@ class TransactionInfoEachDayCrawler {
                 month: parseInt(item[0].split('/')[1]) - 1,
                 day: item[0].split('/')[2]
             };
-            const data = {
-                date: new Date(Date.UTC(year, month, day)),
-                stock_no: stockNo,
-                shares_traded: item[1].split(',').join(''),
-                turnover: item[2].split(',').join(''),
-                opening_price: item[3],
-                max_price: item[4],
-                min_price: item[5],
-                closing_price: item[6],
-                price_difference: item[7],
-                transaction_number: item[8].split(',').join('')
-            };
-            await db.TransactionInfoEachDay.create(data);
+            const date = new Date(Date.UTC(year, month, day));
+            if (!await this.dataExist(date, stockNo)) {
+                const data = {
+                    date: date,
+                    stock_no: stockNo,
+                    shares_traded: item[1].split(',').join(''),
+                    turnover: item[2].split(',').join(''),
+                    opening_price: item[3],
+                    max_price: item[4],
+                    min_price: item[5],
+                    closing_price: item[6],
+                    price_difference: item[7],
+                    transaction_number: item[8].split(',').join('')
+                };
+                await db.TransactionInfoEachDay.create(data);
+            } else {
+                console.log('dataExist.');
+            }
         });
     }
 }
@@ -102,8 +107,8 @@ class TransactionInfoEachDayCrawler {
 main();
 
 async function main () {
-    // const startDate = new Date(2020, 1, 1);
-    const startDate = new Date(2021, 2, 1); // 2021/3/1
+    // const startDate = new Date(2021, 2, 1); // 2021/3/1
+    const startDate = new Date(2020, 0, 1);
     const result = await db.Company.findAll({
         attributes: ['stock_no']
     });
