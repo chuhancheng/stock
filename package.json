@@ -9,8 +9,12 @@
   "author": "Darren",
   "license": "ISC",
   "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
     "crawler": "^1.3.0",
     "csv-string": "^4.0.1",
+    "fake-useragent": "^1.0.1",
+    "node-html-parser": "^5.3.3",
+    "request": "^2.88.2",
     "sequelize": "^6.5.0",
     "sequelize-cli": "^6.2.0",
     "sqlite3": "^5.0.2"
